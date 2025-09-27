@@ -1,0 +1,36 @@
+name: Deploy Portfolio to S3
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'site/**'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::387388780882:role/GitHubActionsS3Deploy
+          aws-region: us-west-2
+
+      - name: Sync site to S3
+        run: |
+          aws s3 sync site/ s3://josephventuri.io/ \
+            --delete \
+            --cache-control "max-age=300,public" \
+            --exclude ".DS_Store"
+
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id E36N88EFYH7YH6 \
+            --paths "/index.html" "/assets/*"
+
