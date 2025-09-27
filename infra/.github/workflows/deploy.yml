@@ -1,0 +1,43 @@
+name: Deploy Portfolio to S3
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'site/**'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::387388780882:role/GitHubActionsS3Deploy
+          aws-region: us-west-2
+
+      # Upload the site (short cache for HTML)
+      - name: Upload index.html
+        run: |
+          aws s3 cp site/index.html s3://josephventuri.io/index.html \
+            --content-type "text/html; charset=utf-8" \
+            --cache-control "max-age=300, must-revalidate"
+
+      # (Optional) sync any other files under site/ if/when you add them
+      - name: Sync remaining files (safe if none)
+        run: |
+          aws s3 sync site/ s3://josephventuri.io/ \
+            --delete --exclude "index.html" --exclude ".DS_Store" \
+            --cache-control "max-age=300,public"
+
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id E36N88EFYH7YH6 \
+            --paths "/index.html"
+
